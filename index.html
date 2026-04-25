@@ -1,0 +1,1980 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Mess Management System</title>
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- jsPDF CDN -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <!-- jsPDF-AutoTable for tables in PDF -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.28/jspdf.plugin.autotable.min.js"></script>
+    <!-- html2pdf.js CDN -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+        body { font-family: 'Inter', sans-serif; overflow-x: hidden; }
+        
+        /* Animations */
+        @keyframes fadeIn {
+            from { opacity: 0; }
+            to { opacity: 1; }
+        }
+        @keyframes slideUp {
+            from { opacity: 0; transform: translateY(20px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        @keyframes pulse {
+            0% { transform: scale(1); }
+            50% { transform: scale(1.05); }
+            100% { transform: scale(1); }
+        }
+        @keyframes bounce-subtle {
+            0%, 100% { transform: translateY(0); }
+            50% { transform: translateY(-3px); }
+        }
+
+        .animate-fade-in { animation: fadeIn 0.4s ease-out forwards; }
+        .animate-slide-up { animation: slideUp 0.5s cubic-bezier(0.16, 1, 0.3, 1) forwards; }
+        
+        .section { display: none; opacity: 0; }
+        .section.active { 
+            display: block; 
+            animation: fadeIn 0.4s ease-out forwards, slideUp 0.5s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+        }
+
+        .loader {
+            border: 3px solid rgba(79, 70, 229, 0.1);
+            border-top: 3px solid #4f46e5;
+            border-radius: 50%;
+            width: 40px;
+            height: 40px;
+            animation: spin 0.8s linear infinite;
+        }
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        /* Glassmorphism & Effects */
+        .glass {
+            background: rgba(255, 255, 255, 0.7);
+            backdrop-filter: blur(12px);
+            -webkit-backdrop-filter: blur(12px);
+            border: 1px solid rgba(255, 255, 255, 0.3);
+        }
+        
+        .card-hover {
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+        .card-hover:hover {
+            transform: translateY(-4px);
+            box-shadow: 0 12px 24px -8px rgba(0, 0, 0, 0.15);
+        }
+
+        .nav-item-active {
+            position: relative;
+        }
+        .nav-item-active::after {
+            content: '';
+            position: absolute;
+            bottom: -4px;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 4px;
+            height: 4px;
+            background: #4f46e5;
+            border-radius: 50%;
+            animation: fadeIn 0.3s ease-out;
+        }
+
+        @media print {
+            .no-print { display: none !important; }
+        }
+        .no-print { transition: opacity 0.2s; }
+
+        /* Update Overlay Styles */
+        #update-overlay {
+            display: none;
+            position: fixed;
+            inset: 0;
+            background: rgba(0, 0, 0, 0.4);
+            backdrop-filter: blur(12px);
+            z-index: 100;
+            align-items: center;
+            justify-content: center;
+            padding: 1.5rem;
+        }
+        #update-overlay.active { display: flex; animation: fadeIn 0.3s ease-out; }
+
+        /* Top App Bar Styles */
+        .top-app-bar {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 64px;
+            background: rgba(255, 255, 255, 0.8);
+            backdrop-filter: blur(16px);
+            -webkit-backdrop-filter: blur(16px);
+            border-bottom: 1px solid rgba(229, 231, 235, 0.5);
+            z-index: 40;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 0 1.5rem;
+        }
+        .logo-text {
+            font-size: 1.75rem;
+            font-weight: 900;
+            letter-spacing: -0.05em;
+            background: linear-gradient(to right, #1d4ed8, #60a5fa);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+        .password-toggle {
+            position: absolute;
+            right: 10px;
+            top: 50%;
+            transform: translateY(-50%);
+            cursor: pointer;
+            color: #9ca3af;
+            background: none;
+            border: none;
+            padding: 5px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        .password-toggle:hover {
+            color: #4f46e5;
+        }
+    </style>
+</head>
+<body class="text-gray-900 min-h-screen bg-[fixed] bg-[#fafaf9] bg-[radial-gradient(at_top_left,_#fef3c7_0%,_transparent_50%),_radial-gradient(at_top_right,_#fce7f3_0%,_transparent_50%),_radial-gradient(at_bottom_left,_#e0f2fe_0%,_transparent_50%)]">
+
+    <!-- Loading Overlay -->
+    <div id="loading-overlay" class="fixed inset-0 bg-white bg-opacity-90 z-50 flex flex-col items-center justify-center">
+        <div class="loader mb-4"></div>
+        <p class="text-gray-600 font-medium">Loading Mess System...</p>
+    </div>
+
+    <!-- Mandatory Update Overlay -->
+    <div id="update-overlay">
+        <div class="bg-white rounded-3xl p-8 max-w-sm w-full text-center shadow-2xl transform transition-all scale-100">
+            <div class="text-6xl mb-4">🚀</div>
+            <h2 class="text-2xl font-black text-gray-900 mb-2">Update Required</h2>
+            <p class="text-gray-500 text-sm mb-6">A new version of <span class="font-bold text-indigo-600">MessManager</span> is available. Please update to continue using the app.</p>
+            
+            <div class="bg-gray-50 rounded-2xl p-4 mb-6 text-left">
+                <div class="flex justify-between items-center mb-2">
+                    <span id="update-version-tag" class="bg-indigo-100 text-indigo-700 text-[10px] font-black px-2 py-0.5 rounded-full uppercase tracking-wider">v1.1.0</span>
+                    <span class="text-[10px] text-gray-400 font-bold uppercase">What's New</span>
+                </div>
+                <p id="update-details-text" class="text-xs text-gray-600 leading-relaxed">Bug fixes and performance improvements.</p>
+            </div>
+
+            <div class="flex flex-col gap-3">
+                <a id="update-download-btn" href="#" target="_blank" class="w-full bg-indigo-600 text-white font-bold py-4 rounded-2xl hover:bg-indigo-700 transition-all shadow-lg shadow-indigo-200 flex items-center justify-center gap-2">
+                    <span>Download Now</span>
+                    <span class="text-lg">📥</span>
+                </a>
+                <button onclick="alert('Please update the app to continue.')" class="text-gray-400 text-xs font-bold hover:text-gray-600 transition-colors py-2">
+                    Not Now (Blocks App)
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Top App Bar -->
+    <header id="top-app-bar" class="top-app-bar glass hidden">
+        <div class="logo-text">Mess</div>
+        <div class="flex items-center gap-4">
+            <button onclick="handleTopBarNotificationClick()" class="relative p-2 text-gray-600 hover:bg-gray-100 rounded-full transition-all">
+                <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-bell"><path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9"/><path d="M10.3 21a1.94 1.94 0 0 0 3.4 0"/></svg>
+                <span id="top-bar-notif-badge" class="absolute top-2 right-2.5 w-2.5 h-2.5 bg-red-500 border-2 border-white rounded-full hidden"></span>
+            </button>
+            <div onclick="handleTopBarProfileClick()" class="w-10 h-10 rounded-full border-2 border-white shadow-sm overflow-hidden bg-indigo-100 cursor-pointer hover:opacity-80 transition-all">
+                <img id="top-bar-profile-img" src="https://api.dicebear.com/7.x/avataaars/svg?seed=User" alt="Profile" class="w-full h-full object-cover" referrerPolicy="no-referrer">
+            </div>
+        </div>
+    </header>
+
+    <main class="max-w-7xl mx-auto p-4 pb-24 pt-20">
+        
+        <!-- LOGIN SECTION -->
+        <section id="login-section" class="section active py-12">
+            <div class="max-w-md mx-auto bg-white rounded-3xl shadow-2xl p-8 border border-gray-100 card-hover animate-slide-up">
+                <!-- Login Form -->
+                <div id="login-container">
+                    <div class="text-center mb-8">
+                        <div class="text-5xl mb-4 animate-bounce">🍱</div>
+                        <h2 class="text-3xl font-black text-gray-900 mb-2">Hello! 👋</h2>
+                        <p class="text-gray-500 font-medium">Ready for a delicious meal today?</p>
+                    </div>
+                    <form id="login-form" class="space-y-4">
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-1">Email Address</label>
+                            <input type="email" id="login-email" required class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none transition-all" placeholder="admin@mess.com">
+                        </div>
+                        <div class="relative">
+                            <label class="block text-sm font-medium text-gray-700 mb-1">Password</label>
+                            <div class="relative">
+                                <input type="password" id="login-password" required class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none transition-all" placeholder="••••••••">
+                                <button type="button" onclick="togglePasswordVisibility('login-password')" class="password-toggle">
+                                    <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-eye"><path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7Z"/><circle cx="12" cy="12" r="3"/></svg>
+                                </button>
+                            </div>
+                        </div>
+                        <button type="submit" class="w-full bg-indigo-600 text-white font-bold py-3 rounded-lg hover:bg-indigo-700 transition-colors shadow-lg shadow-indigo-200">Sign In</button>
+                    </form>
+                    <div class="mt-6 text-center">
+                        <button onclick="toggleAuthMode('register')" class="text-sm font-semibold text-indigo-600 hover:text-indigo-700">Don't have an account? Create one</button>
+                    </div>
+                </div>
+
+                <!-- Register Form -->
+                <div id="register-container" class="hidden">
+                    <div class="text-center mb-8">
+                        <div class="text-4xl mb-2">✨</div>
+                        <h2 class="text-2xl font-bold text-gray-800">Create Account</h2>
+                        <p class="text-gray-500">Join our mess management system</p>
+                    </div>
+                    <form id="register-form" class="space-y-4">
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-1">Full Name</label>
+                            <input type="text" id="register-name" required class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none transition-all" placeholder="John Doe">
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-1">Mobile Number</label>
+                            <input type="tel" id="register-mobile" required class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none transition-all" placeholder="0000000000">
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-1">Email Address</label>
+                            <input type="email" id="register-email" required class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none transition-all" placeholder="user@example.com">
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-1">Password</label>
+                            <div class="relative">
+                                <input type="password" id="register-password" required class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none transition-all" placeholder="••••••••">
+                                <button type="button" onclick="togglePasswordVisibility('register-password')" class="password-toggle">
+                                    <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-eye"><path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7Z"/><circle cx="12" cy="12" r="3"/></svg>
+                                </button>
+                            </div>
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-1">Confirm Password</label>
+                            <div class="relative">
+                                <input type="password" id="register-confirm-password" required class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none transition-all" placeholder="••••••••">
+                                <button type="button" onclick="togglePasswordVisibility('register-confirm-password')" class="password-toggle">
+                                    <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-eye"><path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7Z"/><circle cx="12" cy="12" r="3"/></svg>
+                                </button>
+                            </div>
+                        </div>
+                        <button type="submit" class="w-full bg-indigo-600 text-white font-bold py-3 rounded-lg hover:bg-indigo-700 transition-colors shadow-lg shadow-indigo-200">Create Account</button>
+                    </form>
+                    <div class="mt-6 text-center">
+                        <button onclick="toggleAuthMode('login')" class="text-sm font-semibold text-indigo-600 hover:text-indigo-700">Already have an account? Sign in</button>
+                    </div>
+                </div>
+
+                <div class="mt-6 text-center text-xs text-gray-400 border-t pt-4">
+                    <p>Demo Admin: admin@mess.com / 123456</p>
+                    <p>Demo User: user@mess.com / 123456</p>
+                </div>
+            </div>
+        </section>
+
+        <!-- ADMIN PANEL -->
+        <section id="admin-panel" class="section space-y-6">
+            <!-- Dashboard Tab -->
+            <div id="admin-dashboard" class="admin-content active space-y-6">
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    <div class="bg-white p-6 rounded-xl shadow-sm border border-gray-100 border-t-4 border-t-blue-400 card-hover">
+                        <p class="text-sm text-gray-500 font-medium uppercase tracking-wider">Total Users</p>
+                        <h3 id="stat-total-users" class="text-3xl font-bold text-gray-800">0</h3>
+                    </div>
+                    <div class="bg-white p-6 rounded-xl shadow-sm border border-gray-100 border-t-4 border-t-green-400 card-hover">
+                        <p class="text-sm text-gray-500 font-medium uppercase tracking-wider">Today's Meals</p>
+                        <h3 id="stat-today-meals" class="text-3xl font-bold text-green-600">0</h3>
+                    </div>
+                    <div class="bg-white p-6 rounded-xl shadow-sm border border-gray-100 border-t-4 border-t-indigo-400 card-hover">
+                        <p class="text-sm text-gray-500 font-medium uppercase tracking-wider">Active Users</p>
+                        <h3 id="stat-active-users" class="text-3xl font-bold text-indigo-600">0</h3>
+                    </div>
+                </div>
+                
+                <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-6 card-hover">
+                    <h4 class="text-lg font-bold mb-4">Today's Summary</h4>
+                    <div class="grid grid-cols-3 gap-4 text-center">
+                        <div class="p-4 bg-orange-50 rounded-lg">
+                            <p class="text-xs text-orange-600 font-bold uppercase">Breakfast</p>
+                            <p id="stat-b-count" class="text-xl font-bold">0</p>
+                        </div>
+                        <div class="p-4 bg-blue-50 rounded-lg">
+                            <p class="text-xs text-blue-600 font-bold uppercase">Lunch</p>
+                            <p id="stat-l-count" class="text-xl font-bold">0</p>
+                        </div>
+                        <div class="p-4 bg-purple-50 rounded-lg">
+                            <p class="text-xs text-purple-600 font-bold uppercase">Dinner</p>
+                            <p id="stat-d-count" class="text-xl font-bold">0</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Meal Entry Tab -->
+            <div id="admin-meal-entry" class="admin-content hidden space-y-4">
+                <div class="flex justify-between items-center">
+                    <h3 class="text-xl font-bold">Quick Meal Entry</h3>
+                    <span id="today-date-display" class="bg-indigo-100 text-indigo-700 px-3 py-1 rounded-full text-sm font-bold"></span>
+                </div>
+                <div class="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
+                    <div class="overflow-x-auto">
+                        <table class="w-full text-left">
+                            <thead class="bg-gray-50 border-b border-gray-200">
+                                <tr>
+                                    <th class="px-6 py-3 text-xs font-bold text-gray-500 uppercase">Name</th>
+                                    <th class="px-4 py-3 text-center text-xs font-bold text-gray-500 uppercase">B</th>
+                                    <th class="px-4 py-3 text-center text-xs font-bold text-gray-500 uppercase">L</th>
+                                    <th class="px-4 py-3 text-center text-xs font-bold text-gray-500 uppercase">D</th>
+                                </tr>
+                            </thead>
+                            <tbody id="meal-entry-table-body" class="divide-y divide-gray-100">
+                                <!-- Rows generated by JS -->
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Users Tab -->
+            <div id="admin-users" class="admin-content hidden space-y-6">
+                <div class="flex justify-between items-center">
+                    <h3 class="text-xl font-bold">User Management</h3>
+                    <button onclick="toggleAddUserModal(true)" class="bg-indigo-600 text-white px-4 py-2 rounded-lg font-bold text-sm hover:bg-indigo-700">+ Add User</button>
+                </div>
+                <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4" id="user-list-container">
+                    <!-- User cards generated by JS -->
+                </div>
+            </div>
+
+            <!-- System Tab -->
+            <div id="admin-system" class="admin-content hidden space-y-6">
+                <!-- Global Update Management -->
+                <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
+                    <div class="flex items-center justify-between mb-4">
+                        <h3 class="text-xl font-bold">Global App Update</h3>
+                        <div class="flex items-center gap-2">
+                            <span class="text-xs font-bold text-gray-500">Active</span>
+                            <label class="relative inline-flex items-center cursor-pointer">
+                                <input type="checkbox" id="update-active-toggle" class="sr-only peer" checked>
+                                <div class="w-11 h-6 bg-gray-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-indigo-600"></div>
+                            </label>
+                        </div>
+                    </div>
+                    <form id="global-update-form" class="space-y-4">
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700 mb-1">Latest Version String</label>
+                                <input type="text" id="global-update-version" required class="w-full px-4 py-2 border border-gray-300 rounded-lg outline-none focus:ring-2 focus:ring-indigo-500" placeholder="e.g. 1.1.0">
+                            </div>
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700 mb-1">Download URL</label>
+                                <input type="url" id="global-update-url" required class="w-full px-4 py-2 border border-gray-300 rounded-lg outline-none focus:ring-2 focus:ring-indigo-500" placeholder="https://example.com/app.apk">
+                            </div>
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-1">Update Description</label>
+                            <textarea id="global-update-desc" required rows="3" class="w-full px-4 py-2 border border-gray-300 rounded-lg outline-none focus:ring-2 focus:ring-indigo-500" placeholder="Describe what's new in this version..."></textarea>
+                        </div>
+                        <button type="submit" class="w-full bg-indigo-600 text-white px-6 py-3 rounded-lg font-bold hover:bg-indigo-700 transition-colors shadow-lg shadow-indigo-100">Save Update Config</button>
+                    </form>
+                </div>
+
+                <!-- Mess Details Management -->
+                <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
+                    <h3 class="text-xl font-bold mb-4">Mess Contact Details</h3>
+                    <form id="mess-details-form" class="space-y-4">
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700 mb-1">Mess Name</label>
+                                <input type="text" id="mess-name" required class="w-full px-4 py-2 border border-gray-300 rounded-lg outline-none focus:ring-2 focus:ring-indigo-500" placeholder="e.g. Royal Mess">
+                            </div>
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700 mb-1">Phone Number</label>
+                                <input type="tel" id="mess-phone" required class="w-full px-4 py-2 border border-gray-300 rounded-lg outline-none focus:ring-2 focus:ring-indigo-500" placeholder="e.g. +91 9876543210">
+                            </div>
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-1">Address</label>
+                            <textarea id="mess-address" required rows="2" class="w-full px-4 py-2 border border-gray-300 rounded-lg outline-none focus:ring-2 focus:ring-indigo-500" placeholder="Full address of the mess..."></textarea>
+                        </div>
+                        <button type="submit" class="w-full bg-indigo-600 text-white px-6 py-3 rounded-lg font-bold hover:bg-indigo-700 transition-colors shadow-lg shadow-indigo-100">Save Mess Details</button>
+                    </form>
+                </div>
+
+                <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
+                    <h3 class="text-xl font-bold mb-4">App Update / File Upload</h3>
+                    <form id="upload-file-form" class="space-y-4">
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-1">Update Title / Version</label>
+                            <input type="text" id="update-title" required class="w-full px-4 py-2 border border-gray-300 rounded-lg outline-none focus:ring-2 focus:ring-indigo-500" placeholder="v1.0.1 - New Features">
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-1">Select File (APK, PDF, etc.)</label>
+                            <input type="file" id="update-file" required class="w-full px-4 py-2 border border-gray-300 rounded-lg outline-none focus:ring-2 focus:ring-indigo-500">
+                        </div>
+                        <button type="submit" class="bg-indigo-600 text-white px-6 py-2 rounded-lg font-bold hover:bg-indigo-700 transition-colors">Upload Update</button>
+                    </form>
+                </div>
+
+                <div class="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
+                    <div class="px-6 py-4 border-b border-gray-100">
+                        <h3 class="font-bold">Recent Updates</h3>
+                    </div>
+                    <div class="overflow-x-auto">
+                        <table class="w-full text-left">
+                            <thead class="bg-gray-50">
+                                <tr>
+                                    <th class="px-6 py-3 text-xs font-bold text-gray-500 uppercase">Title</th>
+                                    <th class="px-6 py-3 text-xs font-bold text-gray-500 uppercase">Date</th>
+                                    <th class="px-6 py-3 text-center text-xs font-bold text-gray-500 uppercase">Action</th>
+                                </tr>
+                            </thead>
+                            <tbody id="admin-updates-table-body" class="divide-y divide-gray-100">
+                                <!-- Updates rows -->
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <!-- Bug Reports Management -->
+                <div class="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
+                    <div class="px-6 py-4 border-b border-gray-100 flex justify-between items-center">
+                        <h3 class="font-bold">Bug Reports</h3>
+                        <span class="text-xs text-gray-500">helpsupporherobrine@gmail.com</span>
+                    </div>
+                    <div class="overflow-x-auto">
+                        <table class="w-full text-left">
+                            <thead class="bg-gray-50">
+                                <tr>
+                                    <th class="px-6 py-3 text-xs font-bold text-gray-500 uppercase">User</th>
+                                    <th class="px-6 py-3 text-xs font-bold text-gray-500 uppercase">Description</th>
+                                    <th class="px-6 py-3 text-xs font-bold text-gray-500 uppercase">Date</th>
+                                    <th class="px-6 py-3 text-center text-xs font-bold text-gray-500 uppercase">Status</th>
+                                </tr>
+                            </thead>
+                            <tbody id="admin-bugs-table-body" class="divide-y divide-gray-100">
+                                <!-- Bug reports rows -->
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <!-- Admin Account Section -->
+                <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
+                    <h3 class="text-xl font-bold mb-4">Account</h3>
+                    <button onclick="handleLogout()" class="w-full flex items-center justify-center space-x-2 py-3 bg-red-50 text-red-600 rounded-xl font-bold hover:bg-red-100 transition-colors">
+                        <span>🚪</span>
+                        <span>Logout Admin Account</span>
+                    </button>
+                </div>
+            </div>
+
+            <!-- Notifications Tab -->
+            <div id="admin-notifications" class="admin-content hidden space-y-6">
+                <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
+                    <h3 class="text-xl font-bold mb-4">Send Push Notification</h3>
+                    <form id="send-notification-form" class="space-y-4">
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-1">Title</label>
+                            <input type="text" id="notif-title" required class="w-full px-4 py-2 border border-gray-300 rounded-lg outline-none focus:ring-2 focus:ring-indigo-500" placeholder="Meal Reminder">
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-1">Message</label>
+                            <textarea id="notif-body" required rows="3" class="w-full px-4 py-2 border border-gray-300 rounded-lg outline-none focus:ring-2 focus:ring-indigo-500" placeholder="Lunch is served! Please come to the mess."></textarea>
+                        </div>
+                        <button type="submit" class="w-full bg-indigo-600 text-white px-6 py-3 rounded-lg font-bold hover:bg-indigo-700 transition-colors shadow-lg shadow-indigo-100">Send to All Users</button>
+                    </form>
+                    <p class="mt-4 text-[10px] text-gray-400 italic">*Note: This will store the notification in Firestore. Real background push requires a server-side FCM trigger or Cloud Function.</p>
+                </div>
+
+                <div class="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
+                    <div class="px-6 py-4 border-b border-gray-100">
+                        <h3 class="font-bold">Notification History</h3>
+                    </div>
+                    <div class="overflow-x-auto">
+                        <table class="w-full text-left">
+                            <thead class="bg-gray-50">
+                                <tr>
+                                    <th class="px-6 py-3 text-xs font-bold text-gray-500 uppercase">Title</th>
+                                    <th class="px-6 py-3 text-xs font-bold text-gray-500 uppercase">Message</th>
+                                    <th class="px-6 py-3 text-xs font-bold text-gray-500 uppercase">Date</th>
+                                </tr>
+                            </thead>
+                            <tbody id="admin-notif-history-body" class="divide-y divide-gray-100">
+                                <!-- History rows -->
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+            <!-- User Detail Page (Nested in Admin) -->
+            <div id="admin-user-detail" class="admin-content hidden space-y-6">
+                <button onclick="switchAdminTab('users')" class="text-indigo-600 font-bold flex items-center">
+                    <span class="mr-1">←</span> Back to Users
+                </button>
+                
+                <div id="content-to-print" class="bg-white rounded-2xl shadow-sm border border-gray-100 p-6">
+                    <div class="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-6">
+                        <div>
+                            <h2 id="detail-user-name" class="text-2xl font-bold text-gray-800">User Name</h2>
+                            <p id="detail-user-mobile" class="text-gray-500">Mobile: 0000000000</p>
+                        </div>
+                        <div class="flex flex-wrap gap-2 no-print">
+                            <button onclick="downloadPDF()" class="bg-gray-800 text-white px-4 py-2 rounded-lg text-sm font-bold flex items-center">
+                                📄 Download PDF
+                            </button>
+                            <button onclick="shareWhatsApp()" class="bg-green-600 text-white px-4 py-2 rounded-lg text-sm font-bold flex items-center">
+                                💬 WhatsApp
+                            </button>
+                        </div>
+                    </div>
+
+                    <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
+                        <div class="bg-gray-50 p-4 rounded-xl text-center">
+                            <p class="text-xs text-gray-500 font-bold uppercase">Absent</p>
+                            <p id="detail-stat-absent" class="text-xl font-bold text-red-600">0</p>
+                        </div>
+                        <div class="bg-orange-50 p-4 rounded-xl text-center">
+                            <p class="text-xs text-orange-600 font-bold uppercase">Breakfast</p>
+                            <p id="detail-stat-b" class="text-xl font-bold">0</p>
+                        </div>
+                        <div class="bg-blue-50 p-4 rounded-xl text-center">
+                            <p class="text-xs text-blue-600 font-bold uppercase">Lunch</p>
+                            <p id="detail-stat-l" class="text-xl font-bold">0</p>
+                        </div>
+                        <div class="bg-purple-50 p-4 rounded-xl text-center">
+                            <p class="text-xs text-purple-600 font-bold uppercase">Dinner</p>
+                            <p id="detail-stat-d" class="text-xl font-bold">0</p>
+                        </div>
+                    </div>
+
+                    <div class="flex items-center space-x-4 mb-4">
+                        <label class="text-sm font-bold text-gray-700">Filter Month:</label>
+                        <input type="month" id="detail-month-filter" class="border border-gray-300 rounded-lg px-3 py-1 text-sm outline-none focus:ring-2 focus:ring-indigo-500">
+                    </div>
+
+                    <div class="overflow-x-auto border border-gray-100 rounded-xl">
+                        <table class="w-full text-left">
+                            <thead class="bg-gray-50">
+                                <tr>
+                                    <th class="px-6 py-3 text-xs font-bold text-gray-500 uppercase">Date</th>
+                                    <th class="px-4 py-3 text-center text-xs font-bold text-gray-500 uppercase">B</th>
+                                    <th class="px-4 py-3 text-center text-xs font-bold text-gray-500 uppercase">L</th>
+                                    <th class="px-4 py-3 text-center text-xs font-bold text-gray-500 uppercase">D</th>
+                                </tr>
+                            </thead>
+                            <tbody id="detail-history-table-body" class="divide-y divide-gray-100">
+                                <!-- History rows -->
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- USER PANEL -->
+        <section id="user-panel" class="section space-y-6">
+            <!-- User Home Tab -->
+            <div id="user-home" class="user-content active space-y-6">
+                <!-- User Profile Card -->
+                <div class="bg-indigo-600 rounded-2xl p-6 text-white shadow-lg shadow-indigo-200">
+                    <div class="flex items-center space-x-4">
+                        <div class="w-16 h-16 bg-white bg-opacity-20 rounded-full flex items-center justify-center text-3xl">👤</div>
+                        <div>
+                            <h2 id="user-profile-name" class="text-2xl font-bold">User Name</h2>
+                            <p id="user-profile-mobile" class="text-indigo-100 opacity-80">Mobile: 0000000000</p>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Today's Meals View -->
+                <div class="bg-white rounded-2xl shadow-sm border border-gray-100 p-6">
+                    <div class="flex justify-between items-center mb-4">
+                        <h3 class="text-lg font-bold">Today's Meals</h3>
+                        <span id="user-today-date" class="text-sm font-medium text-gray-500"></span>
+                    </div>
+                    <div class="grid grid-cols-3 gap-4">
+                        <div class="p-4 rounded-xl text-center border border-gray-100" id="user-today-b">
+                            <p class="text-xs font-bold uppercase mb-1">Breakfast</p>
+                            <span class="text-2xl">❌</span>
+                        </div>
+                        <div class="p-4 rounded-xl text-center border border-gray-100" id="user-today-l">
+                            <p class="text-xs font-bold uppercase mb-1">Lunch</p>
+                            <span class="text-2xl">❌</span>
+                        </div>
+                        <div class="p-4 rounded-xl text-center border border-gray-100" id="user-today-d">
+                            <p class="text-xs font-bold uppercase mb-1">Dinner</p>
+                            <span class="text-2xl">❌</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Summary -->
+                <div class="grid grid-cols-2 gap-4">
+                    <div class="bg-white p-4 rounded-2xl shadow-sm border border-gray-100 border-t-4 border-t-rose-400 text-center card-hover">
+                        <p class="text-xs text-gray-500 font-bold uppercase">Total Absent</p>
+                        <p id="user-stat-absent" class="text-2xl font-bold text-rose-600">0</p>
+                    </div>
+                    <div class="bg-white p-4 rounded-2xl shadow-sm border border-gray-100 border-t-4 border-t-sky-400 text-center card-hover">
+                        <p class="text-xs text-gray-500 font-bold uppercase">Total Meals</p>
+                        <p id="user-stat-total" class="text-2xl font-bold text-sky-600">0</p>
+                    </div>
+                </div>
+
+                </div>
+            </div>
+        </section>
+
+            <!-- User Updates Tab -->
+            <div id="user-updates" class="user-content hidden space-y-6">
+                <div class="bg-white rounded-2xl shadow-sm border border-gray-100 p-6">
+                    <h3 class="text-lg font-bold mb-4">Latest App Updates</h3>
+                    <div id="user-updates-container" class="space-y-3">
+                        <!-- Updates list -->
+                        <p class="text-sm text-gray-500 italic">No updates available.</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- User History Tab -->
+            <div id="user-history" class="user-content hidden space-y-6">
+                <div class="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
+                    <div class="px-6 py-4 border-b border-gray-100 flex justify-between items-center">
+                        <h3 class="font-bold">Meal History</h3>
+                        <div class="flex items-center space-x-2">
+                            <label for="user-month-filter" class="text-[10px] font-bold text-gray-400 uppercase">Filter Month:</label>
+                            <input type="month" id="user-month-filter" class="text-xs border rounded px-2 py-1 outline-none focus:ring-1 focus:ring-indigo-500">
+                        </div>
+                    </div>
+                    <div class="overflow-x-auto">
+                        <table class="w-full text-left">
+                            <thead class="bg-gray-50">
+                                <tr>
+                                    <th class="px-6 py-3 text-xs font-bold text-gray-500 uppercase">Date</th>
+                                    <th class="px-4 py-3 text-center text-xs font-bold text-gray-500 uppercase">B</th>
+                                    <th class="px-4 py-3 text-center text-xs font-bold text-gray-500 uppercase">L</th>
+                                    <th class="px-4 py-3 text-center text-xs font-bold text-gray-500 uppercase">D</th>
+                                </tr>
+                            </thead>
+                            <tbody id="user-history-table-body" class="divide-y divide-gray-100">
+                                <!-- History rows -->
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+            <!-- User About Tab -->
+            <div id="user-about" class="user-content hidden space-y-6">
+                <!-- Mess Details Card -->
+                <div class="bg-white rounded-2xl shadow-sm border border-gray-100 p-6 space-y-4">
+                    <h3 class="text-lg font-bold flex items-center">
+                        <span class="mr-2">🏠</span> Mess Details
+                    </h3>
+                    <div class="space-y-3">
+                        <div class="flex items-start space-x-3">
+                            <span class="text-indigo-600">🏢</span>
+                            <div>
+                                <p class="text-xs text-gray-400 font-bold uppercase">Mess Name</p>
+                                <p id="user-mess-name" class="font-medium text-gray-800">Loading...</p>
+                            </div>
+                        </div>
+                        <div class="flex items-start space-x-3">
+                            <span class="text-indigo-600">📞</span>
+                            <div>
+                                <p class="text-xs text-gray-400 font-bold uppercase">Contact</p>
+                                <a id="user-mess-phone-link" href="#" class="font-medium text-indigo-600 hover:underline">Loading...</a>
+                            </div>
+                        </div>
+                        <div class="flex items-start space-x-3">
+                            <span class="text-indigo-600">📍</span>
+                            <div>
+                                <p class="text-xs text-gray-400 font-bold uppercase">Address</p>
+                                <p id="user-mess-address" class="text-sm text-gray-600">Loading...</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Bug Report Section -->
+                <div class="bg-white rounded-2xl shadow-sm border border-gray-100 p-6 space-y-4">
+                    <h3 class="text-lg font-bold flex items-center">
+                        <span class="mr-2">🐞</span> Report a Bug
+                    </h3>
+                    <p class="text-sm text-gray-600">Found an issue? Let us know or email us at <a href="mailto:helpsupporherobrine@gmail.com" class="text-indigo-600 font-bold">helpsupporherobrine@gmail.com</a></p>
+                    <form id="bug-report-form" class="space-y-3">
+                        <textarea id="bug-desc" required rows="3" class="w-full px-4 py-2 border border-gray-300 rounded-xl outline-none focus:ring-2 focus:ring-indigo-500 text-sm" placeholder="Describe the bug you found..."></textarea>
+                        <button type="submit" class="w-full bg-red-50 text-red-600 px-6 py-2 rounded-xl font-bold hover:bg-red-100 transition-colors text-sm">Submit Bug Report</button>
+                    </form>
+                </div>
+
+                <!-- My Bug Reports Status -->
+                <div class="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
+                    <div class="px-6 py-4 border-b border-gray-100">
+                        <h3 class="font-bold">My Bug Reports</h3>
+                    </div>
+                    <div class="overflow-x-auto">
+                        <table class="w-full text-left">
+                            <thead class="bg-gray-50">
+                                <tr>
+                                    <th class="px-6 py-3 text-xs font-bold text-gray-500 uppercase">Description</th>
+                                    <th class="px-6 py-3 text-xs font-bold text-gray-500 uppercase">Status</th>
+                                </tr>
+                            </thead>
+                            <tbody id="user-bugs-table-body" class="divide-y divide-gray-100 text-sm">
+                                <!-- User bug reports -->
+                                <tr>
+                                    <td colspan="2" class="px-6 py-4 text-center text-gray-500 italic">No reports yet.</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <!-- About App Card -->
+                <div class="bg-white rounded-2xl shadow-sm border border-gray-100 p-6 space-y-4">
+                    <h3 class="text-lg font-bold flex items-center">
+                        <span class="mr-2">ℹ️</span> About App
+                    </h3>
+                    <div class="space-y-4">
+                        <div class="flex justify-between items-center py-2 border-b border-gray-50">
+                            <span class="text-sm text-gray-500">App Name</span>
+                            <span class="text-sm font-bold text-indigo-600">Mess Management App</span>
+                        </div>
+                        <div class="flex justify-between items-center py-2 border-b border-gray-50">
+                            <span class="text-sm text-gray-500">Version</span>
+                            <span class="text-sm font-bold text-indigo-600">v1.0.0</span>
+                        </div>
+                        <div class="flex justify-between items-center py-2 border-b border-gray-50">
+                            <span class="text-sm text-gray-500">Developer</span>
+                            <span class="text-sm font-bold text-indigo-600">HeroBrine Dev</span>
+                        </div>
+                        <div class="flex justify-between items-center py-2">
+                            <span class="text-sm text-gray-500">Support</span>
+                            <a href="mailto:helpsupporherobrine@gmail.com" class="text-sm font-bold text-indigo-600">Email Support</a>
+                        </div>
+                    </div>
+                    <div class="pt-4 border-t border-gray-50">
+                        <button onclick="handleLogout()" class="w-full flex items-center justify-center space-x-2 py-3 bg-red-50 text-red-600 rounded-xl font-bold hover:bg-red-100 transition-colors">
+                            <span>🚪</span>
+                            <span>Logout Account</span>
+                        </button>
+                    </div>
+                    <p class="text-[10px] text-gray-400 text-center mt-4">© 2026 Mess Management System. All rights reserved.</p>
+                </div>
+            </div>
+        </section>
+    </main>
+
+    <!-- Bottom Navigation -->
+    <div id="bottom-nav" class="fixed bottom-0 left-0 right-0 glass border-t border-gray-200 px-4 py-2 z-40 hidden">
+        <!-- Admin Nav Items -->
+        <div id="admin-bottom-nav" class="flex w-full justify-around hidden">
+            <button onclick="switchAdminTab('dashboard')" class="admin-nav-item flex flex-col items-center space-y-1 text-indigo-600" data-tab="dashboard">
+                <span class="text-xl">📊</span>
+                <span class="text-[10px] font-bold">Dash</span>
+            </button>
+            <button onclick="switchAdminTab('meal-entry')" class="admin-nav-item flex flex-col items-center space-y-1 text-gray-400" data-tab="meal-entry">
+                <span class="text-xl">📝</span>
+                <span class="text-[10px] font-bold">Entry</span>
+            </button>
+            <button onclick="switchAdminTab('users')" class="admin-nav-item flex flex-col items-center space-y-1 text-gray-400" data-tab="users">
+                <span class="text-xl">👥</span>
+                <span class="text-[10px] font-bold">Users</span>
+            </button>
+            <button onclick="switchAdminTab('system')" class="admin-nav-item flex flex-col items-center space-y-1 text-gray-400" data-tab="system">
+                <span class="text-xl">⚙️</span>
+                <span class="text-[10px] font-bold">System</span>
+            </button>
+            <button onclick="switchAdminTab('notifications')" class="admin-nav-item flex flex-col items-center space-y-1 text-gray-400" data-tab="notifications">
+                <span class="text-xl">🔔</span>
+                <span class="text-[10px] font-bold">Notify</span>
+            </button>
+        </div>
+        <!-- User Nav Items -->
+        <div id="user-bottom-nav" class="flex w-full justify-around hidden">
+            <button onclick="switchUserTab('home')" class="user-nav-item flex flex-col items-center space-y-1 text-indigo-600" data-tab="home">
+                <span class="text-xl">🏠</span>
+                <span class="text-[10px] font-bold">Home</span>
+            </button>
+            <button onclick="switchUserTab('history')" class="user-nav-item flex flex-col items-center space-y-1 text-gray-400" data-tab="history">
+                <span class="text-xl">📜</span>
+                <span class="text-[10px] font-bold">History</span>
+            </button>
+            <button onclick="switchUserTab('updates')" class="user-nav-item flex flex-col items-center space-y-1 text-gray-400" data-tab="updates">
+                <span class="text-xl">🔔</span>
+                <span class="text-[10px] font-bold">Updates</span>
+            </button>
+            <button onclick="switchUserTab('about')" class="user-nav-item flex flex-col items-center space-y-1 text-gray-400" data-tab="about">
+                <span class="text-xl">ℹ️</span>
+                <span class="text-[10px] font-bold">About</span>
+            </button>
+        </div>
+    </div>
+
+    <!-- ADD USER MODAL -->
+    <div id="add-user-modal" class="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4 hidden">
+        <div class="bg-white rounded-2xl shadow-2xl w-full max-w-md p-6 space-y-4">
+            <h3 class="text-xl font-bold">Add New User</h3>
+            <form id="add-user-form" class="space-y-4">
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Full Name</label>
+                    <input type="text" id="new-user-name" required class="w-full px-4 py-2 border border-gray-300 rounded-lg outline-none focus:ring-2 focus:ring-indigo-500">
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Mobile Number</label>
+                    <input type="tel" id="new-user-mobile" required class="w-full px-4 py-2 border border-gray-300 rounded-lg outline-none focus:ring-2 focus:ring-indigo-500">
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Email Address</label>
+                    <input type="email" id="new-user-email" required class="w-full px-4 py-2 border border-gray-300 rounded-lg outline-none focus:ring-2 focus:ring-indigo-500">
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Password</label>
+                    <div class="relative">
+                        <input type="password" id="new-user-password" required class="w-full px-4 py-2 border border-gray-300 rounded-lg outline-none focus:ring-2 focus:ring-indigo-500" placeholder="Min 6 chars">
+                        <button type="button" onclick="togglePasswordVisibility('new-user-password')" class="password-toggle">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-eye"><path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7Z"/><circle cx="12" cy="12" r="3"/></svg>
+                        </button>
+                    </div>
+                </div>
+                <div class="flex space-x-3 pt-2">
+                    <button type="button" onclick="toggleAddUserModal(false)" class="flex-1 px-4 py-2 border border-gray-300 rounded-lg font-bold text-gray-600 hover:bg-gray-50">Cancel</button>
+                    <button type="submit" class="flex-1 px-4 py-2 bg-indigo-600 text-white rounded-lg font-bold hover:bg-indigo-700">Save User</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- EDIT USER MODAL -->
+    <div id="edit-user-modal" class="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4 hidden">
+        <div class="bg-white rounded-2xl shadow-2xl w-full max-w-md p-6 space-y-4">
+            <h3 class="text-xl font-bold">Edit User Account</h3>
+            <form id="edit-user-form" class="space-y-4">
+                <input type="hidden" id="edit-user-id">
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Full Name</label>
+                    <input type="text" id="edit-user-name" required class="w-full px-4 py-2 border border-gray-300 rounded-lg outline-none focus:ring-2 focus:ring-indigo-500">
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Mobile Number</label>
+                    <input type="tel" id="edit-user-mobile" required class="w-full px-4 py-2 border border-gray-300 rounded-lg outline-none focus:ring-2 focus:ring-indigo-500">
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Role</label>
+                    <select id="edit-user-role" class="w-full px-4 py-2 border border-gray-300 rounded-lg outline-none focus:ring-2 focus:ring-indigo-500">
+                        <option value="user">User</option>
+                        <option value="admin">Admin</option>
+                    </select>
+                </div>
+                <div class="flex space-x-3 pt-2">
+                    <button type="button" onclick="toggleEditUserModal(false)" class="flex-1 px-4 py-2 border border-gray-300 rounded-lg font-bold text-gray-600 hover:bg-gray-50">Cancel</button>
+                    <button type="submit" class="flex-1 px-4 py-2 bg-indigo-600 text-white rounded-lg font-bold hover:bg-indigo-700">Update User</button>
+                </div>
+            </form>
+        </div>
+    </div>
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/9.22.0/firebase-app.js";
+        import { getAuth, signInWithEmailAndPassword, onAuthStateChanged, signOut, createUserWithEmailAndPassword } from "https://www.gstatic.com/firebasejs/9.22.0/firebase-auth.js";
+        import { getFirestore, doc, setDoc, getDoc, getDocs, collection, onSnapshot, query, where, orderBy, deleteDoc, updateDoc, addDoc } from "https://www.gstatic.com/firebasejs/9.22.0/firebase-firestore.js";
+        import { getStorage, ref, uploadBytes, getDownloadURL, deleteObject } from "https://www.gstatic.com/firebasejs/9.22.0/firebase-storage.js";
+        import { getMessaging, getToken, onMessage } from "https://www.gstatic.com/firebasejs/9.22.0/firebase-messaging.js";
+
+        // --- APP STATE ---
+        const APP_VERSION = "1.0.0";
+        let currentUser = null;
+        let userRole = null;
+        let allUsers = [];
+        let allMeals = [];
+        let currentUserMeals = [];
+        let allUpdates = [];
+        let selectedUserId = null;
+        let unsubscribers = [];
+        
+        // Firebase Instances
+        let app, auth, db, storage, messaging;
+        const VAPID_KEY = "BC_IdYK_xYhSDV3cHvo-8w6-p14fVnyyLqmf-szZ7MfvTITyfefekjki8l9TkUeeprq0HktZzub-j9HftRzqHHA";
+        let secondaryAuth;
+
+        // --- ERROR HANDLING ---
+        const OperationType = {
+            CREATE: 'create',
+            UPDATE: 'update',
+            DELETE: 'delete',
+            LIST: 'list',
+            GET: 'get',
+            WRITE: 'write',
+        };
+
+        function handleFirestoreError(error, operationType, path) {
+            const errInfo = {
+                error: error instanceof Error ? error.message : String(error),
+                authInfo: {
+                    userId: auth?.currentUser?.uid,
+                    email: auth?.currentUser?.email
+                },
+                operationType,
+                path
+            };
+            console.error('Firestore Error: ', JSON.stringify(errInfo));
+            alert(`Error: ${error.message || "Something went wrong."}`);
+        }
+
+        // --- HELPER FUNCTIONS ---
+        function toggleLoading(show) {
+            const overlay = document.getElementById('loading-overlay');
+            if (overlay) overlay.style.display = show ? 'flex' : 'none';
+        }
+
+        function showSection(sectionId) {
+            document.querySelectorAll('.section').forEach(s => s.classList.remove('active'));
+            const section = document.getElementById(sectionId);
+            if (section) {
+                section.classList.add('active');
+                const topBar = document.getElementById('top-app-bar');
+                const bottomNav = document.getElementById('bottom-nav');
+                if (sectionId === 'login-section') {
+                    if (topBar) topBar.classList.add('hidden');
+                    if (bottomNav) bottomNav.classList.add('hidden');
+                } else {
+                    if (topBar) topBar.classList.remove('hidden');
+                    if (bottomNav) bottomNav.classList.remove('hidden');
+                    if (sectionId === 'admin-panel') {
+                        document.getElementById('admin-bottom-nav').classList.remove('hidden');
+                        document.getElementById('user-bottom-nav').classList.add('hidden');
+                    } else {
+                        document.getElementById('admin-bottom-nav').classList.add('hidden');
+                        document.getElementById('user-bottom-nav').classList.remove('hidden');
+                    }
+                }
+            }
+        }
+
+        // --- VERSION CHECK LOGIC ---
+        async function checkAppUpdate() {
+            try {
+                const updateDoc = await getDoc(doc(db, "settings", "update_config"));
+                if (updateDoc.exists()) {
+                    const data = updateDoc.data();
+                    if (data.active && isVersionNewer(APP_VERSION, data.latest_version)) {
+                        document.getElementById('update-version-tag').textContent = `v${data.latest_version}`;
+                        document.getElementById('update-details-text').textContent = data.details;
+                        document.getElementById('update-download-btn').href = data.download_link;
+                        document.getElementById('update-overlay').classList.add('active');
+                        throw new Error("Update Required");
+                    }
+                }
+            } catch (error) {
+                if (error.message === "Update Required") throw error;
+                console.error("Update check failed:", error);
+            }
+        }
+
+        const isVersionNewer = (current, latest) => {
+            const c = current.split('.').map(Number);
+            const l = latest.split('.').map(Number);
+            for (let i = 0; i < Math.max(c.length, l.length); i++) {
+                const cv = c[i] || 0;
+                const lv = l[i] || 0;
+                if (lv > cv) return true;
+                if (lv < cv) return false;
+            }
+            return false;
+        };
+
+        // --- NOTIFICATIONS ---
+        async function setupNotifications(userId) {
+            try {
+                const permission = await Notification.requestPermission();
+                if (permission === 'granted' && messaging) {
+                    const token = await getToken(messaging, { vapidKey: VAPID_KEY });
+                    if (token) {
+                        await setDoc(doc(db, "fcm_tokens", userId), {
+                            token,
+                            updatedAt: new Date().toISOString()
+                        });
+                    }
+                }
+            } catch (error) {
+                console.error("Notification setup failed:", error);
+            }
+        }
+
+        // --- ADMIN LOGIC ---
+        function initAdminListeners() {
+            const now = new Date();
+            const currentMonth = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+            if (document.getElementById('detail-month-filter')) {
+                document.getElementById('detail-month-filter').value = currentMonth;
+            }
+
+            onSnapshot(doc(db, "settings", "update_config"), (doc) => {
+                if (doc.exists()) {
+                    const data = doc.data();
+                    document.getElementById('global-update-version').value = data.latest_version || "";
+                    document.getElementById('global-update-url').value = data.download_link || "";
+                    document.getElementById('global-update-desc').value = data.details || "";
+                    document.getElementById('update-active-toggle').checked = data.active ?? true;
+                }
+            });
+
+            onSnapshot(doc(db, "settings", "mess_details"), (doc) => {
+                if (doc.exists()) {
+                    const data = doc.data();
+                    document.getElementById('mess-name').value = data.name || "";
+                    document.getElementById('mess-phone').value = data.phone || "";
+                    document.getElementById('mess-address').value = data.address || "";
+                }
+            });
+
+            const unsubUsers = onSnapshot(collection(db, "users"), (snapshot) => {
+                allUsers = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+                renderAdminUsers();
+                renderMealEntry();
+                updateAdminStats();
+            }, (error) => handleFirestoreError(error, OperationType.LIST, "users"));
+            unsubscribers.push(unsubUsers);
+
+            const unsubMeals = onSnapshot(collection(db, "meals"), (snapshot) => {
+                allMeals = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+                renderMealEntry();
+                updateAdminStats();
+                if (selectedUserId) renderUserDetail(selectedUserId);
+            }, (error) => handleFirestoreError(error, OperationType.LIST, "meals"));
+            unsubscribers.push(unsubMeals);
+
+            const unsubUpdates = onSnapshot(query(collection(db, "app_updates"), orderBy("createdAt", "desc")), (snapshot) => {
+                allUpdates = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+                renderAdminUpdates();
+            }, (error) => handleFirestoreError(error, OperationType.LIST, "app_updates"));
+            unsubscribers.push(unsubUpdates);
+
+            const unsubNotifs = onSnapshot(query(collection(db, "notifications"), orderBy("createdAt", "desc")), (snapshot) => {
+                const notifs = snapshot.docs.map(doc => doc.data());
+                renderNotifHistory(notifs);
+            }, (error) => handleFirestoreError(error, OperationType.LIST, "notifications"));
+            unsubscribers.push(unsubNotifs);
+
+            const unsubBugs = onSnapshot(query(collection(db, "bug_reports"), orderBy("createdAt", "desc")), (snapshot) => {
+                const bugs = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+                renderAdminBugs(bugs);
+                const badge = document.getElementById('top-bar-notif-badge');
+                const hasPending = bugs.some(b => b.status === 'pending');
+                if (hasPending) badge.classList.remove('hidden');
+                else badge.classList.add('hidden');
+            }, (error) => handleFirestoreError(error, OperationType.LIST, "bug_reports"));
+            unsubscribers.push(unsubBugs);
+
+            document.getElementById('today-date-display').textContent = formatDate(getToday());
+        }
+
+        function renderAdminBugs(bugs) {
+            const tbody = document.getElementById('admin-bugs-table-body');
+            if (!tbody) return;
+            tbody.innerHTML = bugs.map(b => `
+                <tr>
+                    <td class="px-6 py-4">
+                        <div class="text-sm font-bold text-gray-900">${b.userName}</div>
+                        <div class="text-xs text-gray-500">${b.userId}</div>
+                    </td>
+                    <td class="px-6 py-4 text-sm text-gray-600">${b.description}</td>
+                    <td class="px-6 py-4 text-sm text-gray-500">${formatDate(b.createdAt)}</td>
+                    <td class="px-6 py-4 text-center">
+                        <button onclick="toggleBugStatus('${b.id}', '${b.status === 'pending' ? 'resolved' : 'pending'}')" 
+                                class="px-3 py-1 rounded-full text-xs font-bold ${b.status === 'resolved' ? 'bg-green-100 text-green-700' : 'bg-yellow-100 text-yellow-700'}">
+                            ${b.status}
+                        </button>
+                    </td>
+                </tr>
+            `).join('');
+        };
+
+        // --- USER LOGIC ---
+        function initUserListeners(userId) {
+            const now = new Date();
+            const currentMonth = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+            document.getElementById('user-month-filter').value = currentMonth;
+
+            const unsubUser = onSnapshot(doc(db, "users", userId), (doc) => {
+                const data = doc.data();
+                if (data) {
+                    document.getElementById('user-profile-name').textContent = data.name;
+                    document.getElementById('user-profile-mobile').textContent = `Mobile: ${data.mobile}`;
+                }
+            });
+            unsubscribers.push(unsubUser);
+
+            const unsubMeals = onSnapshot(query(collection(db, "meals"), where("userId", "==", userId)), (snapshot) => {
+                currentUserMeals = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }))
+                    .sort((a, b) => b.date.localeCompare(a.date));
+                renderUserPanel(currentUserMeals);
+            });
+            unsubscribers.push(unsubMeals);
+
+            const unsubUpdates = onSnapshot(query(collection(db, "app_updates"), orderBy("createdAt", "desc")), (snapshot) => {
+                allUpdates = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+                renderUserUpdates();
+                const badge = document.getElementById('top-bar-notif-badge');
+                if (allUpdates.length > 0) badge.classList.remove('hidden');
+                else badge.classList.add('hidden');
+            });
+            unsubscribers.push(unsubUpdates);
+
+            const unsubUserBugs = onSnapshot(query(collection(db, "bug_reports"), where("userId", "==", userId)), (snapshot) => {
+                const bugs = snapshot.docs.map(doc => doc.data())
+                    .sort((a, b) => b.createdAt.localeCompare(a.createdAt));
+                renderUserBugs(bugs);
+            });
+            unsubscribers.push(unsubUserBugs);
+
+            const unsubMess = onSnapshot(doc(db, "settings", "mess_details"), (doc) => {
+                if (doc.exists()) {
+                    const data = doc.data();
+                    document.getElementById('user-mess-name').textContent = data.name;
+                    document.getElementById('user-mess-phone-link').textContent = data.phone;
+                    document.getElementById('user-mess-phone-link').href = `tel:${data.phone}`;
+                    document.getElementById('user-mess-address').textContent = data.address;
+                }
+            });
+            unsubscribers.push(unsubMess);
+        }
+
+        function renderUserBugs(bugs) {
+            const tbody = document.getElementById('user-bugs-table-body');
+            if (!tbody) return;
+            if (bugs.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="2" class="px-6 py-4 text-center text-gray-500 italic">No reports yet.</td></tr>';
+                return;
+            }
+            tbody.innerHTML = bugs.map(b => `
+                <tr>
+                    <td class="px-6 py-4 text-gray-700">${b.description}</td>
+                    <td class="px-6 py-4">
+                        <span class="px-2 py-0.5 rounded text-[10px] font-bold uppercase ${b.status === 'resolved' ? 'bg-green-100 text-green-700' : 'bg-yellow-100 text-yellow-700'}">
+                            ${b.status}
+                        </span>
+                    </td>
+                </tr>
+            `).join('');
+        };
+
+        window.togglePasswordVisibility = (inputId) => {
+            const input = document.getElementById(inputId);
+            const button = input.nextElementSibling;
+            if (input.type === 'password') {
+                input.type = 'text';
+                button.innerHTML = '<svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-eye-off"><path d="M9.88 9.88a3 3 0 1 0 4.24 4.24"/><path d="M10.73 5.08A10.43 10.43 0 0 1 12 5c7 0 10 7 10 7a13.16 13.16 0 0 1-1.67 2.68"/><path d="M6.61 6.61A13.52 13.52 0 0 0 2 12s3 7 10 7a9.74 9.74 0 0 0 5.39-1.61"/><line x1="2" x2="22" y1="2" y2="22"/></svg>';
+            } else {
+                input.type = 'password';
+                button.innerHTML = '<svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-eye"><path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7Z"/><circle cx="12" cy="12" r="3"/></svg>';
+            }
+        };
+
+        // --- AUTH LISTENER ---
+        function setupAuthListener() {
+            if (!auth) {
+                console.error("Auth not initialized before setupAuthListener");
+                return;
+            }
+            onAuthStateChanged(auth, async (user) => {
+                if (user) {
+                    currentUser = user;
+                    toggleLoading(true);
+                    
+                    let attempts = 0;
+                    const checkUser = async () => {
+                        try {
+                            const userDoc = await getDoc(doc(db, "users", user.uid));
+                            if (userDoc.exists()) {
+                                const userData = userDoc.data();
+                                userRole = userData.role;
+                                
+                                document.getElementById('top-bar-profile-img').src = `https://api.dicebear.com/7.x/avataaars/svg?seed=${encodeURIComponent(userData.name)}`;
+
+                                if (userRole === 'admin') {
+                                    initAdminListeners();
+                                    showSection('admin-panel');
+                                } else {
+                                    await checkAppUpdate();
+                                    setupNotifications(user.uid);
+                                    initUserListeners(user.uid);
+                                    showSection('user-panel');
+                                }
+                                toggleLoading(false);
+                            } else if (attempts < 5) {
+                                attempts++;
+                                setTimeout(checkUser, 1000);
+                            } else {
+                                alert("User data not found!");
+                                handleLogout();
+                                toggleLoading(false);
+                            }
+                        } catch (error) {
+                            if (error.message === "Update Required") return;
+                            handleFirestoreError(error, OperationType.GET, `users/${user.uid}`);
+                            toggleLoading(false);
+                        }
+                    };
+                    checkUser();
+                } else {
+                    showSection('login-section');
+                    toggleLoading(false);
+                }
+            });
+        }
+
+        // --- INITIALIZE FIREBASE ---
+        const firebaseConfig = {
+            apiKey: "AIzaSyArrAsCfA7lph0NTRyhBOAJkYDw4tnn56c",
+            authDomain: "food-a1130.firebaseapp.com",
+            databaseURL: "https://food-a1130-default-rtdb.firebaseio.com",
+            projectId: "food-a1130",
+            storageBucket: "food-a1130.firebasestorage.app",
+            messagingSenderId: "559460046290",
+            appId: "1:559460046290:web:093091d1db3c38a6dbe40b",
+            measurementId: "G-GB082ZZJVD"
+        };
+
+        async function startApp() {
+            try {
+                app = initializeApp(firebaseConfig);
+                auth = getAuth(app);
+                db = getFirestore(app);
+                storage = getStorage(app);
+                try {
+                    messaging = getMessaging(app);
+                    if (messaging) {
+                        onMessage(messaging, (payload) => {
+                            showNotificationToast(payload.notification.title, payload.notification.body);
+                        });
+                    }
+                } catch (msgError) {
+                    console.warn("Firebase Messaging not supported or failed to initialize:", msgError);
+                }
+
+                const secondaryApp = initializeApp(firebaseConfig, "Secondary");
+                secondaryAuth = getAuth(secondaryApp);
+
+                setupAuthListener();
+            } catch (error) {
+                console.error("Firebase Initialization Failed:", error);
+                alert("Failed to connect to Firebase. Please check configuration.");
+            }
+        }
+
+        // --- UTILS ---
+        const getToday = () => {
+            const d = new Date();
+            return d.toISOString().split('T')[0];
+        };
+
+        const formatDate = (dateStr) => {
+            const d = new Date(dateStr);
+            return d.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' });
+        };
+
+
+
+        // --- AUTH LOGIC ---
+        window.toggleAuthMode = (mode) => {
+            if (mode === 'register') {
+                document.getElementById('login-container').classList.add('hidden');
+                document.getElementById('register-container').classList.remove('hidden');
+            } else {
+                document.getElementById('login-container').classList.remove('hidden');
+                document.getElementById('register-container').classList.add('hidden');
+            }
+        };
+
+        document.getElementById('login-form').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            toggleLoading(true);
+            const email = document.getElementById('login-email').value;
+            const password = document.getElementById('login-password').value;
+
+            try {
+                await signInWithEmailAndPassword(auth, email, password);
+            } catch (error) {
+                alert("Login Failed: " + error.message);
+                toggleLoading(false);
+            }
+        });
+
+        document.getElementById('register-form').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            toggleLoading(true);
+            
+            const name = document.getElementById('register-name').value;
+            const mobile = document.getElementById('register-mobile').value;
+            const email = document.getElementById('register-email').value;
+            const password = document.getElementById('register-password').value;
+            const confirmPassword = document.getElementById('register-confirm-password').value;
+
+            if (password !== confirmPassword) {
+                alert("Passwords do not match!");
+                toggleLoading(false);
+                return;
+            }
+
+            try {
+                const userCredential = await createUserWithEmailAndPassword(auth, email, password);
+                const uid = userCredential.user.uid;
+                const role = (email === "gamingboylive46@gmail.com" || email === "pinky06inst@gmail.com") ? 'admin' : 'user';
+
+                await setDoc(doc(db, "users", uid), {
+                    name, mobile, email, role
+                });
+            } catch (error) {
+                alert("Registration Failed: " + error.message);
+                toggleLoading(false);
+            }
+        });
+
+        window.handleLogout = async () => {
+            toggleLoading(true);
+            unsubscribers.forEach(unsub => unsub());
+            unsubscribers = [];
+            await signOut(auth);
+            location.reload();
+        };
+
+
+
+        document.getElementById('global-update-form').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            toggleLoading(true);
+            const latest_version = document.getElementById('global-update-version').value;
+            const download_link = document.getElementById('global-update-url').value;
+            const details = document.getElementById('global-update-desc').value;
+            const active = document.getElementById('update-active-toggle').checked;
+
+            try {
+                await setDoc(doc(db, "settings", "update_config"), {
+                    latest_version,
+                    download_link,
+                    details,
+                    active,
+                    updatedAt: new Date().toISOString()
+                });
+                alert("Global update settings saved!");
+            } catch (error) {
+                handleFirestoreError(error, OperationType.WRITE, "settings/update_config");
+            } finally {
+                toggleLoading(false);
+            }
+        });
+
+
+
+
+
+        const showNotificationToast = (title, body) => {
+            const toast = document.createElement('div');
+            toast.className = "fixed top-4 right-4 left-4 md:left-auto md:w-80 bg-white border-l-4 border-indigo-600 shadow-2xl rounded-xl p-4 z-[100] transform transition-all translate-y-0 animate-bounce";
+            toast.innerHTML = `
+                <div class="flex items-start">
+                    <div class="flex-shrink-0 text-2xl mr-3">🔔</div>
+                    <div class="flex-1">
+                        <h4 class="font-bold text-gray-900 text-sm">${title}</h4>
+                        <p class="text-xs text-gray-600 mt-1">${body}</p>
+                    </div>
+                    <button onclick="this.parentElement.parentElement.remove()" class="text-gray-400 hover:text-gray-600">✕</button>
+                </div>
+            `;
+            document.body.appendChild(toast);
+            setTimeout(() => toast.remove(), 8000);
+        };
+
+        document.getElementById('send-notification-form')?.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            toggleLoading(true);
+            const title = document.getElementById('notif-title').value;
+            const body = document.getElementById('notif-body').value;
+
+            try {
+                await addDoc(collection(db, "notifications"), {
+                    title,
+                    body,
+                    createdAt: new Date().toISOString(),
+                    sentBy: currentUser.uid
+                });
+                alert("Notification sent!");
+                e.target.reset();
+            } catch (error) {
+                handleFirestoreError(error, OperationType.WRITE, "notifications");
+            } finally {
+                toggleLoading(false);
+            }
+        });
+
+        document.getElementById('mess-details-form')?.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            toggleLoading(true);
+            const name = document.getElementById('mess-name').value;
+            const phone = document.getElementById('mess-phone').value;
+            const address = document.getElementById('mess-address').value;
+
+            try {
+                await setDoc(doc(db, "settings", "mess_details"), {
+                    name, phone, address, updatedAt: new Date().toISOString()
+                });
+                alert("Mess details saved!");
+            } catch (error) {
+                handleFirestoreError(error, OperationType.WRITE, "settings/mess_details");
+            } finally {
+                toggleLoading(false);
+            }
+        });
+
+        document.getElementById('bug-report-form')?.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            toggleLoading(true);
+            const description = document.getElementById('bug-desc').value;
+
+            try {
+                await addDoc(collection(db, "bug_reports"), {
+                    userId: currentUser.uid,
+                    userName: document.getElementById('user-profile-name').textContent,
+                    description,
+                    createdAt: new Date().toISOString(),
+                    status: 'pending'
+                });
+                alert("Bug report submitted!");
+                e.target.reset();
+            } catch (error) {
+                handleFirestoreError(error, OperationType.WRITE, "bug_reports");
+            } finally {
+                toggleLoading(false);
+            }
+        });
+
+
+
+        window.toggleBugStatus = async (id, newStatus) => {
+            try {
+                await updateDoc(doc(db, "bug_reports", id), { status: newStatus });
+            } catch (error) {
+                handleFirestoreError(error, OperationType.UPDATE, `bug_reports/${id}`);
+            }
+        };
+
+        const renderNotifHistory = (notifs) => {
+            const tbody = document.getElementById('admin-notif-history-body');
+            if (!tbody) return;
+            tbody.innerHTML = notifs.map(n => `
+                <tr>
+                    <td class="px-6 py-4 font-medium text-gray-800">${n.title}</td>
+                    <td class="px-6 py-4 text-sm text-gray-500">${n.body}</td>
+                    <td class="px-6 py-4 text-sm text-gray-500">${formatDate(n.createdAt)}</td>
+                </tr>
+            `).join('');
+        };
+
+        window.switchAdminTab = (tabId) => {
+            document.querySelectorAll('.admin-content').forEach(c => c.classList.add('hidden'));
+            document.getElementById(`admin-${tabId}`).classList.remove('hidden');
+            
+            // Update bottom nav
+            document.querySelectorAll('.admin-nav-item').forEach(item => {
+                item.classList.remove('text-indigo-600', 'nav-item-active');
+                item.classList.add('text-gray-400');
+                if (item.dataset.tab === tabId || (tabId === 'user-detail' && item.dataset.tab === 'users')) {
+                    item.classList.add('text-indigo-600', 'nav-item-active');
+                    item.classList.remove('text-gray-400');
+                }
+            });
+
+            if (tabId !== 'user-detail') selectedUserId = null;
+        };
+
+        window.switchUserTab = (tabId) => {
+            document.querySelectorAll('.user-content').forEach(c => c.classList.add('hidden'));
+            document.getElementById(`user-${tabId}`).classList.remove('hidden');
+            
+            // Update bottom nav
+            document.querySelectorAll('.user-nav-item').forEach(item => {
+                item.classList.remove('text-indigo-600', 'nav-item-active');
+                item.classList.add('text-gray-400');
+                if (item.dataset.tab === tabId) {
+                    item.classList.add('text-indigo-600', 'nav-item-active');
+                    item.classList.remove('text-gray-400');
+                }
+            });
+        };
+
+        // --- TOP BAR HANDLERS ---
+        window.handleTopBarNotificationClick = () => {
+            if (userRole === 'admin') {
+                switchAdminTab('notifications');
+            } else {
+                switchUserTab('updates');
+            }
+        };
+
+        window.handleTopBarProfileClick = () => {
+            if (userRole === 'admin') {
+                switchAdminTab('system');
+            } else {
+                switchUserTab('about');
+            }
+        };
+
+        const updateAdminStats = () => {
+            const today = getToday();
+            const todayMeals = allMeals.filter(m => m.date === today);
+            
+            let bCount = 0, lCount = 0, dCount = 0;
+            todayMeals.forEach(m => {
+                if (m.breakfast) bCount++;
+                if (m.lunch) lCount++;
+                if (m.dinner) dCount++;
+            });
+
+            document.getElementById('stat-total-users').textContent = allUsers.length;
+            document.getElementById('stat-today-meals').textContent = bCount + lCount + dCount;
+            document.getElementById('stat-active-users').textContent = allUsers.filter(u => u.role === 'user').length;
+            
+            document.getElementById('stat-b-count').textContent = bCount;
+            document.getElementById('stat-l-count').textContent = lCount;
+            document.getElementById('stat-d-count').textContent = dCount;
+        };
+
+        const renderAdminUsers = () => {
+            const container = document.getElementById('user-list-container');
+            container.innerHTML = allUsers.map(user => `
+                <div class="bg-white p-4 rounded-xl border border-gray-100 shadow-sm hover:shadow-md transition-shadow flex flex-col space-y-3">
+                    <div onclick="openUserDetail('${user.id}')" class="cursor-pointer flex items-center space-x-3">
+                        <div class="w-12 h-12 rounded-full overflow-hidden bg-indigo-50 border border-indigo-100 flex-shrink-0">
+                            <img src="https://api.dicebear.com/7.x/avataaars/svg?seed=${encodeURIComponent(user.name)}" alt="${user.name}" class="w-full h-full object-cover" referrerPolicy="no-referrer">
+                        </div>
+                        <div class="flex-1 min-w-0">
+                            <h4 class="font-bold text-gray-800 truncate">${user.name}</h4>
+                            <p class="text-xs text-gray-500">${user.mobile}</p>
+                            <span class="inline-block mt-1 px-2 py-0.5 rounded text-[10px] font-bold uppercase ${user.role === 'admin' ? 'bg-purple-100 text-purple-700' : 'bg-gray-100 text-gray-600'}">${user.role}</span>
+                        </div>
+                        <span class="text-indigo-600 font-bold">→</span>
+                    </div>
+                    <div class="flex border-t pt-3 space-x-2">
+                        <button onclick="event.stopPropagation(); openEditUserModal('${user.id}')" class="flex-1 text-xs font-bold py-1.5 rounded bg-blue-50 text-blue-600 hover:bg-blue-100">Edit</button>
+                        <button onclick="event.stopPropagation(); handleDeleteUser('${user.id}')" class="flex-1 text-xs font-bold py-1.5 rounded bg-red-50 text-red-600 hover:bg-red-100">Delete</button>
+                    </div>
+                </div>
+            `).join('');
+        };
+
+        window.openEditUserModal = (userId) => {
+            const user = allUsers.find(u => u.id === userId);
+            if (!user) return;
+            document.getElementById('edit-user-id').value = user.id;
+            document.getElementById('edit-user-name').value = user.name;
+            document.getElementById('edit-user-mobile').value = user.mobile;
+            document.getElementById('edit-user-role').value = user.role;
+            toggleEditUserModal(true);
+        };
+
+        window.toggleEditUserModal = (show) => {
+            document.getElementById('edit-user-modal').classList.toggle('hidden', !show);
+        };
+
+        document.getElementById('edit-user-form').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            toggleLoading(true);
+            const id = document.getElementById('edit-user-id').value;
+            const name = document.getElementById('edit-user-name').value;
+            const mobile = document.getElementById('edit-user-mobile').value;
+            const role = document.getElementById('edit-user-role').value;
+
+            try {
+                await updateDoc(doc(db, "users", id), { name, mobile, role });
+                alert("User updated!");
+                toggleEditUserModal(false);
+            } catch (error) {
+                handleFirestoreError(error, OperationType.UPDATE, `users/${id}`);
+            } finally {
+                toggleLoading(false);
+            }
+        });
+
+        window.handleDeleteUser = async (userId) => {
+            if (userId === currentUser.uid) {
+                alert("Cannot delete self!");
+                return;
+            }
+            if (!confirm("Are you sure?")) return;
+            
+            toggleLoading(true);
+            try {
+                const mealDocs = await getDocs(query(collection(db, "meals"), where("userId", "==", userId)));
+                await Promise.all(mealDocs.docs.map(d => deleteDoc(d.ref)));
+                await deleteDoc(doc(db, "users", userId));
+                alert("User deleted!");
+            } catch (error) {
+                handleFirestoreError(error, OperationType.DELETE, `users/${userId}`);
+            } finally {
+                toggleLoading(false);
+            }
+        };
+
+        // --- SYSTEM UPDATES LOGIC ---
+        document.getElementById('upload-file-form').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const title = document.getElementById('update-title').value;
+            const file = document.getElementById('update-file').files[0];
+
+            if (!file) return;
+
+            toggleLoading(true);
+            try {
+                const fileName = `${Date.now()}_${file.name}`;
+                const storageRef = ref(storage, `updates/${fileName}`);
+                const snapshot = await uploadBytes(storageRef, file);
+                const downloadURL = await getDownloadURL(snapshot.ref);
+
+                await addDoc(collection(db, "app_updates"), {
+                    title, fileName, fileUrl: downloadURL, createdAt: new Date().toISOString()
+                });
+                alert("Update uploaded!");
+                e.target.reset();
+            } catch (error) {
+                handleFirestoreError(error, OperationType.WRITE, "app_updates");
+            } finally {
+                toggleLoading(false);
+            }
+        });
+
+        const renderAdminUpdates = () => {
+            const tbody = document.getElementById('admin-updates-table-body');
+            tbody.innerHTML = allUpdates.map(update => `
+                <tr>
+                    <td class="px-6 py-4 font-medium text-gray-800">${update.title}</td>
+                    <td class="px-6 py-4 text-sm text-gray-500">${formatDate(update.createdAt)}</td>
+                    <td class="px-6 py-4 text-center">
+                        <button onclick="handleDeleteUpdate('${update.id}', '${update.fileName}')" class="text-red-600 font-bold hover:text-red-700">Delete</button>
+                    </td>
+                </tr>
+            `).join('');
+        };
+
+        window.handleDeleteUpdate = async (id, fileName) => {
+            if (!confirm("Are you sure?")) return;
+            toggleLoading(true);
+            try {
+                const storageRef = ref(storage, `updates/${fileName}`);
+                await deleteObject(storageRef);
+                await deleteDoc(doc(db, "app_updates", id));
+                alert("Update deleted!");
+            } catch (error) {
+                handleFirestoreError(error, OperationType.DELETE, `app_updates/${id}`);
+            } finally {
+                toggleLoading(false);
+            }
+        };
+
+        const renderUserUpdates = () => {
+            const container = document.getElementById('user-updates-container');
+            if (allUpdates.length === 0) {
+                container.innerHTML = '<p class="text-sm text-gray-500 italic">No updates available.</p>';
+                return;
+            }
+            container.innerHTML = allUpdates.map(update => `
+                <div class="flex items-center justify-between p-3 bg-gray-50 rounded-xl border border-gray-100">
+                    <div>
+                        <h4 class="font-bold text-gray-800 text-sm">${update.title}</h4>
+                        <p class="text-[10px] text-gray-500">${formatDate(update.createdAt)} • ${(update.fileSize / 1024 / 1024).toFixed(2)} MB</p>
+                    </div>
+                    <a href="${update.fileUrl}" target="_blank" class="bg-indigo-600 text-white px-3 py-1.5 rounded-lg text-xs font-bold hover:bg-indigo-700">Download</a>
+                </div>
+            `).join('');
+        };
+
+        const renderMealEntry = () => {
+            const today = getToday();
+            const tbody = document.getElementById('meal-entry-table-body');
+            const users = allUsers.filter(u => u.role === 'user');
+            
+            tbody.innerHTML = users.map(user => {
+                const mealId = `${user.id}_${today}`;
+                const meal = allMeals.find(m => m.id === mealId) || { breakfast: false, lunch: false, dinner: false };
+                
+                return `
+                    <tr>
+                        <td class="px-6 py-4">
+                            <div class="flex items-center space-x-3">
+                                <div class="w-8 h-8 rounded-full overflow-hidden bg-indigo-50 border border-indigo-100 flex-shrink-0">
+                                    <img src="https://api.dicebear.com/7.x/avataaars/svg?seed=${encodeURIComponent(user.name)}" alt="${user.name}" class="w-full h-full object-cover" referrerPolicy="no-referrer">
+                                </div>
+                                <span class="font-medium text-gray-800">${user.name}</span>
+                            </div>
+                        </td>
+                        <td class="px-4 py-4 text-center">
+                            <button onclick="toggleMeal('${user.id}', 'breakfast', ${!meal.breakfast})" class="text-xl">${meal.breakfast ? '✔️' : '❌'}</button>
+                        </td>
+                        <td class="px-4 py-4 text-center">
+                            <button onclick="toggleMeal('${user.id}', 'lunch', ${!meal.lunch})" class="text-xl">${meal.lunch ? '✔️' : '❌'}</button>
+                        </td>
+                        <td class="px-4 py-4 text-center">
+                            <button onclick="toggleMeal('${user.id}', 'dinner', ${!meal.dinner})" class="text-xl">${meal.dinner ? '✔️' : '❌'}</button>
+                        </td>
+                    </tr>
+                `;
+            }).join('');
+        };
+
+        window.toggleMeal = async (userId, type, value) => {
+            const today = getToday();
+            const mealId = `${userId}_${today}`;
+            const mealRef = doc(db, "meals", mealId);
+            
+            try {
+                const mealDoc = await getDoc(mealRef);
+                const data = mealDoc.exists() ? mealDoc.data() : { userId, date: today, breakfast: false, lunch: false, dinner: false };
+                data[type] = value;
+                await setDoc(mealRef, data);
+            } catch (error) {
+                handleFirestoreError(error, OperationType.WRITE, `meals/${mealId}`);
+            }
+        };
+
+        window.toggleAddUserModal = (show) => {
+            document.getElementById('add-user-modal').classList.toggle('hidden', !show);
+        };
+
+        document.getElementById('add-user-form').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            toggleLoading(true);
+            
+            const name = document.getElementById('new-user-name').value;
+            const mobile = document.getElementById('new-user-mobile').value;
+            const email = document.getElementById('new-user-email').value;
+            const password = document.getElementById('new-user-password').value;
+
+            try {
+                const userCredential = await createUserWithEmailAndPassword(secondaryAuth, email, password);
+                const uid = userCredential.user.uid;
+                await setDoc(doc(db, "users", uid), { name, mobile, email, role: 'user' });
+                await signOut(secondaryAuth);
+                alert("User added!");
+                toggleAddUserModal(false);
+                e.target.reset();
+            } catch (error) {
+                handleFirestoreError(error, OperationType.WRITE, "users");
+            } finally {
+                toggleLoading(false);
+            }
+        });
+
+        window.openUserDetail = (userId) => {
+            selectedUserId = userId;
+            switchAdminTab('user-detail');
+            renderUserDetail(userId);
+        };
+
+        const renderUserDetail = (userId) => {
+            const today = getToday();
+            const user = allUsers.find(u => u.id === userId);
+            if (!user) return;
+
+            document.getElementById('detail-user-name').textContent = user.name;
+            document.getElementById('detail-user-mobile').textContent = `Mobile: ${user.mobile}`;
+
+            const monthFilter = document.getElementById('detail-month-filter').value; // YYYY-MM
+            const userMeals = allMeals.filter(m => m.userId === userId);
+
+            let fullMonthHistory = [];
+            if (monthFilter) {
+                const [year, month] = monthFilter.split('-').map(Number);
+                const daysInMonth = new Date(year, month, 0).getDate();
+                
+                // If the filtered month is the current month, only show up to today
+                const now = new Date();
+                const isCurrentMonth = (year === now.getFullYear() && month === (now.getMonth() + 1));
+                const endDay = isCurrentMonth ? now.getDate() : daysInMonth;
+
+                for (let i = endDay; i >= 1; i--) {
+                    const dateStr = `${year}-${String(month).padStart(2, '0')}-${String(i).padStart(2, '0')}`;
+                    const meal = userMeals.find(m => m.date === dateStr) || { date: dateStr, breakfast: false, lunch: false, dinner: false };
+                    fullMonthHistory.push(meal);
+                }
+            } else {
+                // If no month filter, show last 30 days
+                const startDate = new Date();
+                for (let i = 0; i < 30; i++) {
+                    const d = new Date();
+                    d.setDate(startDate.getDate() - i);
+                    const dateStr = d.toISOString().split('T')[0];
+                    const meal = userMeals.find(m => m.date === dateStr) || { date: dateStr, breakfast: false, lunch: false, dinner: false };
+                    fullMonthHistory.push(meal);
+                }
+            }
+
+            let bCount = 0, lCount = 0, dCount = 0;
+            fullMonthHistory.forEach(m => {
+                if (m.breakfast) bCount++;
+                if (m.lunch) lCount++;
+                if (m.dinner) dCount++;
+            });
+
+            document.getElementById('detail-stat-b').textContent = bCount;
+            document.getElementById('detail-stat-l').textContent = lCount;
+            document.getElementById('detail-stat-d').textContent = dCount;
+            
+            const absentCount = fullMonthHistory.filter(m => {
+                if (m.date === today) return false; // Don't count today as absent yet
+                return !m.breakfast && !m.lunch && !m.dinner;
+            }).length;
+            document.getElementById('detail-stat-absent').textContent = absentCount;
+
+            const tbody = document.getElementById('detail-history-table-body');
+            tbody.innerHTML = fullMonthHistory.map(m => `
+                <tr>
+                    <td class="px-6 py-3 text-sm text-gray-600">${formatDate(m.date)}</td>
+                    <td class="px-4 py-3 text-center">${m.breakfast ? '✔️' : '❌'}</td>
+                    <td class="px-4 py-3 text-center">${m.lunch ? '✔️' : '❌'}</td>
+                    <td class="px-4 py-3 text-center">${m.dinner ? '✔️' : '❌'}</td>
+                </tr>
+            `).join('');
+        };
+
+        document.getElementById('detail-month-filter').addEventListener('change', () => {
+            if (selectedUserId) renderUserDetail(selectedUserId);
+        });
+
+        document.getElementById('user-month-filter').addEventListener('change', () => {
+            renderUserPanel(currentUserMeals);
+        });
+
+        window.downloadPDF = async () => {
+            const element = document.getElementById('content-to-print');
+            const user = allUsers.find(u => u.id === selectedUserId);
+            if (!user) {
+                alert("User not found!");
+                return;
+            }
+            const fileName = `${user.name.replace(/\s+/g, '_')}_Meal_Report.pdf`;
+
+            // Style adjustment for printing
+            const originalBoxShadow = element.style.boxShadow;
+            element.style.boxShadow = 'none';
+
+            const opt = {
+                margin:       10,
+                filename:     fileName,
+                image:        { type: 'jpeg', quality: 0.98 },
+                html2canvas:  { scale: 2, useCORS: true },
+                jsPDF:        { unit: 'mm', format: 'a4', orientation: 'portrait' }
+            };
+
+            try {
+                toggleLoading(true);
+                // html2pdf returns a promise
+                await html2pdf().set(opt).from(element).save();
+                toggleLoading(false);
+            } catch (error) {
+                console.error("PDF Generation Error:", error);
+                alert("Failed to generate PDF. Please try again.");
+                toggleLoading(false);
+            } finally {
+                element.style.boxShadow = originalBoxShadow;
+            }
+        };
+
+        window.shareWhatsApp = () => {
+            const user = allUsers.find(u => u.id === selectedUserId);
+            const b = document.getElementById('detail-stat-b').textContent;
+            const l = document.getElementById('detail-stat-l').textContent;
+            const d = document.getElementById('detail-stat-d').textContent;
+            
+            const text = `*Mess Meal Report*\nName: ${user.name}\nBreakfast: ${b}\nLunch: ${l}\nDinner: ${d}\nTotal Meals: ${parseInt(b)+parseInt(l)+parseInt(d)}`;
+            window.open(`https://wa.me/${user.mobile}?text=${encodeURIComponent(text)}`);
+        };
+
+        // --- USER LOGIC ---
+
+
+        const renderUserPanel = (userMeals) => {
+            const today = getToday();
+            document.getElementById('user-today-date').textContent = formatDate(today);
+            
+            const todayMeal = userMeals.find(m => m.date === today) || { breakfast: false, lunch: false, dinner: false };
+            
+            const updateTodayBox = (id, val) => {
+                const el = document.getElementById(id);
+                el.querySelector('span').textContent = val ? '✔️' : '❌';
+                el.className = `p-4 rounded-xl text-center border ${val ? 'bg-green-50 border-green-200' : 'bg-red-50 border-red-200'}`;
+            };
+
+            updateTodayBox('user-today-b', todayMeal.breakfast);
+            updateTodayBox('user-today-l', todayMeal.lunch);
+            updateTodayBox('user-today-d', todayMeal.dinner);
+
+            // Generate full history for the filtered month
+            let monthFilter = document.getElementById('user-month-filter').value; // YYYY-MM
+            if (!monthFilter) {
+                const now = new Date();
+                monthFilter = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+                document.getElementById('user-month-filter').value = monthFilter;
+            }
+
+            const [year, month] = monthFilter.split('-').map(Number);
+            const daysInMonth = new Date(year, month, 0).getDate();
+            const now = new Date();
+            const isCurrentMonth = (year === now.getFullYear() && month === (now.getMonth() + 1));
+            
+            // Show history up to today if current month, otherwise show full month
+            const endDay = isCurrentMonth ? now.getDate() : daysInMonth;
+            const fullHistory = [];
+
+            for (let i = endDay; i >= 1; i--) {
+                const dateStr = `${year}-${String(month).padStart(2, '0')}-${String(i).padStart(2, '0')}`;
+                const meal = userMeals.find(m => m.date === dateStr) || { date: dateStr, breakfast: false, lunch: false, dinner: false };
+                fullHistory.push(meal);
+            }
+
+            let bCount = 0, lCount = 0, dCount = 0;
+            fullHistory.forEach(m => {
+                if (m.breakfast) bCount++;
+                if (m.lunch) lCount++;
+                if (m.dinner) dCount++;
+            });
+
+            document.getElementById('user-stat-total').textContent = bCount + lCount + dCount;
+            // Absent count: Days in the selected month where NO meal was taken (excluding today if no meals yet)
+            const absentCount = fullHistory.filter(m => {
+                if (m.date === today) return false;
+                return !m.breakfast && !m.lunch && !m.dinner;
+            }).length;
+            document.getElementById('user-stat-absent').textContent = absentCount;
+
+            const tbody = document.getElementById('user-history-table-body');
+            tbody.innerHTML = fullHistory.map(m => `
+                <tr>
+                    <td class="px-6 py-4 text-sm text-gray-600">${formatDate(m.date)}</td>
+                    <td class="px-4 py-4 text-center">${m.breakfast ? '✔️' : '❌'}</td>
+                    <td class="px-4 py-4 text-center">${m.lunch ? '✔️' : '❌'}</td>
+                    <td class="px-4 py-4 text-center">${m.dinner ? '✔️' : '❌'}</td>
+                </tr>
+            `).join('');
+        };
+
+        // --- INITIALIZATION ---
+        startApp();
+    </script>
+</body>
+</html>
+
